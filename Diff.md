@@ -108,3 +108,233 @@
    - Adding `radio.addGatewayRole()` makes the **second version** actively participate in mesh routing as a gateway. Nodes can discover it and choose optimal paths.  
    - Without any gateway role, the **first version** can only broadcast, relying on range rather than routing.
 
+```cpp
+#include <Arduino.h>						#include <Arduino.h>
+#include "LoraMesher.h"						#include "LoraMesher.h"
+
+//Using LILYGO TTGO T-BEAM v1.1 				//Using LILYGO TTGO T-BEAM v1.1 
+#define BOARD_LED   4						#define BOARD_LED   4
+#define LED_ON      LOW						#define LED_ON      LOW
+#define LED_OFF     HIGH					#define LED_OFF     HIGH
+
+							      <
+LoraMesher& radio = LoraMesher::getInstance();			LoraMesher& radio = LoraMesher::getInstance();
+
+uint32_t dataCounter = 0;					uint32_t dataCounter = 0;
+struct dataPacket {						struct dataPacket {
+    int type = 0; // 0 for counter, 1 for wan packet	      |	    uint32_t counter = 0;
+    union {						      <
+        uint32_t counter = 0;				      <
+        uint8_t data[4];				      <
+    } data;						      <
+};								};
+
+dataPacket* helloPacket = new dataPacket;			dataPacket* helloPacket = new dataPacket;
+
+dataPacket* returnPacket = new dataPacket;		      <
+							      <
+//Led flash							//Led flash
+void led_Flash(uint16_t flashes, uint16_t delaymS) {		void led_Flash(uint16_t flashes, uint16_t delaymS) {
+    uint16_t index;						    uint16_t index;
+    for (index = 1; index <= flashes; index++) {		    for (index = 1; index <= flashes; index++) {
+        digitalWrite(BOARD_LED, LED_ON);			        digitalWrite(BOARD_LED, LED_ON);
+        delay(delaymS);						        delay(delaymS);
+        digitalWrite(BOARD_LED, LED_OFF);			        digitalWrite(BOARD_LED, LED_OFF);
+        delay(delaymS);						        delay(delaymS);
+    }								    }
+}								}
+
+/**								/**
+ * @brief Print the counter of the packet			 * @brief Print the counter of the packet
+ *								 *
+ * @param data							 * @param data
+ */								 */
+void printPacket(dataPacket data, uint16_t src) {	      |	void printPacket(dataPacket data) {
+    if (data.type == 0)					      |	    Serial.printf("Hello Counter received nº %d\n", data.coun
+    {							      <
+        Serial.printf("DATA:%d %x\n", data.data.counter, src) <
+        // Serial.printf("Hello Counte r received nº %d\n", d <
+    }							      <
+    else{						      <
+        for(int i = 0; i < 4; i++)			      <
+        {						      <
+            Serial.println(data.data.data[i]);		      <
+        }						      <
+    }							      <
+}								}
+
+/**								/**
+ * @brief Iterate through the payload of the packet and print	 * @brief Iterate through the payload of the packet and print
+ *								 *
+ * @param packet						 * @param packet
+ */								 */
+void printDataPacket(AppPacket<dataPacket>* packet) {		void printDataPacket(AppPacket<dataPacket>* packet) {
+    Serial.printf("Packet arrived from %X with size %d\n", pa	    Serial.printf("Packet arrived from %X with size %d\n", pa
+
+    //Get the payload to iterate through it			    //Get the payload to iterate through it
+    dataPacket* dPacket = packet->payload;			    dataPacket* dPacket = packet->payload;
+    size_t payloadLength = packet->getPayloadLength();		    size_t payloadLength = packet->getPayloadLength();
+    uint16_t src = packet->src;				      <
+
+    for (size_t i = 0; i < payloadLength; i++) {		    for (size_t i = 0; i < payloadLength; i++) {
+        //Print the packet					        //Print the packet
+        printPacket(dPacket[i], src);			      |	        printPacket(dPacket[i]);
+    }								    }
+}								}
+
+/**								/**
+ * @brief Function that process the received packets		 * @brief Function that process the received packets
+ *								 *
+ */								 */
+void processReceivedPackets(void*) {				void processReceivedPackets(void*) {
+    for (;;) {							    for (;;) {
+        /* Wait for the notification of processReceivedPacket	        /* Wait for the notification of processReceivedPacket
+        ulTaskNotifyTake(pdPASS, portMAX_DELAY);		        ulTaskNotifyTake(pdPASS, portMAX_DELAY);
+        led_Flash(1, 100); //one quick LED flashes to indicat	        led_Flash(1, 100); //one quick LED flashes to indicat
+
+        //Iterate through all the packets inside the Received	        //Iterate through all the packets inside the Received
+        while (radio.getReceivedQueueSize() > 0) {		        while (radio.getReceivedQueueSize() > 0) {
+            Serial.println("ReceivedUserData_TaskHandle notif	            Serial.println("ReceivedUserData_TaskHandle notif
+            Serial.printf("Queue receiveUserData size: %d\n",	            Serial.printf("Queue receiveUserData size: %d\n",
+
+            //Get the first element inside the Received User 	            //Get the first element inside the Received User 
+            AppPacket<dataPacket>* packet = radio.getNextAppP	            AppPacket<dataPacket>* packet = radio.getNextAppP
+
+            //Print the data packet				            //Print the data packet
+            printDataPacket(packet);				            printDataPacket(packet);
+
+            //Delete the packet when used. It is very importa	            //Delete the packet when used. It is very importa
+            radio.deletePacket(packet);				            radio.deletePacket(packet);
+        }							        }
+    }								    }
+}								}
+
+TaskHandle_t receiveLoRaMessage_Handle = NULL;			TaskHandle_t receiveLoRaMessage_Handle = NULL;
+
+/**								/**
+ * @brief Create a Receive Messages Task and add it to the Lo	 * @brief Create a Receive Messages Task and add it to the Lo
+ *								 *
+ */								 */
+void createReceiveMessages() {					void createReceiveMessages() {
+    int res = xTaskCreate(					    int res = xTaskCreate(
+        processReceivedPackets,					        processReceivedPackets,
+        "Receive App Task",					        "Receive App Task",
+        4096,							        4096,
+        (void*) 1,						        (void*) 1,
+        2,							        2,
+        &receiveLoRaMessage_Handle);				        &receiveLoRaMessage_Handle);
+    if (res != pdPASS) {					    if (res != pdPASS) {
+        Serial.printf("Error: Receive App Task creation gave 	        Serial.printf("Error: Receive App Task creation gave 
+    }								    }
+							      <
+    radio.setReceiveAppDataTaskHandle(receiveLoRaMessage_Hand <
+}								}
+
+
+/**								/**
+ * @brief Initialize LoRaMesher					 * @brief Initialize LoRaMesher
+ *								 *
+ */								 */
+void setupLoraMesher() {					void setupLoraMesher() {
+    // Example on how to change the module. See LoraMesherCon |	    //Get the configuration of the LoRaMesher
+    LoraMesher::LoraMesherConfig config;		      |	    LoraMesher::LoraMesherConfig config = LoraMesher::LoraMes
+    #ifdef HELTEC					      |
+        config.module = LoraMesher::LoraModules::SX1262_MOD;  |	    //Set the configuration of the LoRaMesher (TTGO T-BEAM v1
+    #endif						      |	    config.loraCs = 18;
+							      |	    config.loraRst = 23;
+    #ifndef HELTEC					      |	    config.loraIrq = 26;
+        config.module = LoraMesher::LoraModules::SX1276_MOD;  |	    config.loraIo1 = 33;
+    #endif						      <
+							      <
+    config.loraCs = CS;					      <
+    config.loraRst = RST;				      <
+    config.loraIrq = IRQ;				      <
+    config.loraIo1 = IO1;				      <
+							      <
+    #ifdef HELTEC					      <
+        SPI.begin(9, 11, 10, CS); //Initialize SPI with the c <
+        config.spi = &SPI;				      <
+    #endif						      <
+
+    //Init the loramesher with a processReceivedPackets funct |	    config.module = LoraMesher::LoraModules::SX1276_MOD;
+							      >
+							      >	    //Init the loramesher with a configuration
+    radio.begin(config);					    radio.begin(config);
+
+    //Create the receive task and add it to the LoRaMesher	    //Create the receive task and add it to the LoRaMesher
+    createReceiveMessages();					    createReceiveMessages();
+
+							      >	    //Set the task handle to the LoRaMesher
+							      >	    radio.setReceiveAppDataTaskHandle(receiveLoRaMessage_Hand
+							      >
+    //Start LoRaMesher						    //Start LoRaMesher
+    radio.start();						    radio.start();
+
+    #ifdef IS_GATEWAY					      <
+        radio.addGatewayRole();				      <
+    #endif						      <
+							      <
+    Serial.println("Lora initialized");				    Serial.println("Lora initialized");
+}								}
+
+
+void setup() {							void setup() {
+    Serial.begin(115200);					    Serial.begin(115200);
+
+    Serial.println("initBoard");				    Serial.println("initBoard");
+    pinMode(BOARD_LED, OUTPUT); //setup pin as output for ind	    pinMode(BOARD_LED, OUTPUT); //setup pin as output for ind
+    led_Flash(2, 125);          //two quick LED flashes to in	    led_Flash(2, 125);          //two quick LED flashes to in
+    setupLoraMesher();						    setupLoraMesher();
+}								}
+
+
+void loop() {							void loop() {
+        for (;;) {					      |	    for (;;) {
+							      >	        Serial.printf("Send packet %d\n", dataCounter);
+
+            #ifdef IS_GATEWAY				      |	        helloPacket->counter = dataCounter++;
+                if (Serial.available())			      <
+                {					      <
+                    uint8_t data[7];			      <
+                    Serial.readBytes(data, 7);		      <
+                    returnPacket->type = 1;		      <
+                    // Serial.println("TO SEND: ");	      <
+                    for(int i = 0; i < 4; i++)		      <
+                    {					      <
+                        returnPacket->data.data[i] = data[i]; <
+                        // Serial.println(data[i]);	      <
+                    }					      <
+                    uint16_t dst = data[5] + 256 * data[4];   <
+                    // Serial.println(dst);		      <
+                    Serial.flush();			      <
+                    radio.createPacketAndSend(dst, returnPack <
+                }					      <
+            #endif					      <
+							      <
+            #ifndef IS_GATEWAY				      <
+                Serial.printf("Send packet %d\n", dataCounter <
+							      <
+                helloPacket->data.counter = dataCounter++;    <
+                helloPacket->type = 0;			      <
+                					      <
+                RouteNode* dst = radio.getClosestGateway(); / <
+                uint16_t addr;				      <
+                if (dst != nullptr)			      <
+                    addr = dst->networkNode.address; //Get th <
+                else 					      <
+                    addr = BROADCAST_ADDR;		      <
+                Serial.printf("Sending packet to %X\n", addr) <
+							      <
+                //Create packet and send it.		      <
+                // radio.createPacketAndSend(BROADCAST_ADDR,  <
+                radio.createPacketAndSend(addr, helloPacket,  <
+            #endif					      <
+
+            //Wait 20 seconds to send the next packet	      |	        //Create packet and send it.
+            vTaskDelay(20000 / portTICK_PERIOD_MS);	      |	        radio.createPacketAndSend(BROADCAST_ADDR, helloPacket
+        }						      |
+							      >	        //Wait 20 seconds to send the next packet
+							      >	        vTaskDelay(20000 / portTICK_PERIOD_MS);
+							      >	    }
+}								}
+```
