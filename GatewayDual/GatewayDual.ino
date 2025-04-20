@@ -72,14 +72,17 @@ void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
 
 // This should also be in little endian format, see above.
-static const u1_t PROGMEM DEVEUI[8]={0x8a, 0xbf, 0xaa, 0xdd, 0x59, 0xb2, 0x2f, 0x7e}; //7E2FB259DDAABF8A
+// static const u1_t PROGMEM DEVEUI[8]={0x8a, 0xbf, 0xaa, 0xdd, 0x59, 0xb2, 0x2f, 0x7e}; //7E2FB259DDAABF8A
+static const u1_t PROGMEM DEVEUI[8]={0x62, 0x6f, 0xaf, 0xe1, 0x67, 0xe0, 0xaa, 0x80}; //80aae067e1af6f62
+
 void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
 
 // This key should be in big endian format (or, since it is not really a
 // number but a block of memory, endianness does not really apply). In
 // practice, a key taken from ttnctl can be copied as-is.
-static const u1_t PROGMEM APPKEY[16] = {0xBC, 0xD0, 0x7B, 0x8B, 0x6C, 0x91, 0xB4, 0x62, 0xC3, 0x22, 0xA8, 0xAC, 0xAB, 0x4B, 0x52, 0xBB};
+// static const u1_t PROGMEM APPKEY[16] = {0xBC, 0xD0, 0x7B, 0x8B, 0x6C, 0x91, 0xB4, 0x62, 0xC3, 0x22, 0xA8, 0xAC, 0xAB, 0x4B, 0x52, 0xBB};
+static const u1_t PROGMEM APPKEY[16] = { 0x0c, 0xab, 0xec, 0x54, 0xbf, 0x0d, 0x94, 0x76, 0xf9, 0x37, 0x5a, 0xca, 0xa1, 0x9d, 0x99, 0x1f };
 void os_getDevKey (u1_t* buf) {  memcpy_P(buf, APPKEY, 16);}
 
 
@@ -92,25 +95,25 @@ static osjob_t sendjob;
 const unsigned TX_INTERVAL = 10;
 
 
-// class cHalConfiguration_t: public Arduino_LMIC::HalConfiguration_t
-// {
-//   public:
-//     virtual u1_t queryBusyPin(void) override {return 13;};
-//     virtual bool queryUsingDcdc(void) override {return true;};
-//     virtual bool queryUsingDIO2AsRfSwitch(void) override {return true;};
-//     virtual bool queryUsingDIO3AsTCXOSwitch(void) override {return true;};
-// };
+class cHalConfiguration_t: public Arduino_LMIC::HalConfiguration_t
+{
+  public:
+    virtual u1_t queryBusyPin(void) override {return 13;};
+    virtual bool queryUsingDcdc(void) override {return true;};
+    virtual bool queryUsingDIO2AsRfSwitch(void) override {return true;};
+    virtual bool queryUsingDIO3AsTCXOSwitch(void) override {return true;};
+};
 
-// cHalConfiguration_t myConfig;
+cHalConfiguration_t myConfig;
 
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
-   .nss = 10, // nano 10 | heltec 8
+   .nss = 8, // nano 10 | heltec 8
    .rxtx = LMIC_UNUSED_PIN,
-   .rst = 9, // nano 9 | heltec 12
-   .dio = {2, 6, 7}, // nano 2 6 7 | heltec 14 un un
-  //  .pConfig = &myConfig,
+   .rst = 12, // nano 9 | heltec 12
+   .dio = {14, LMIC_UNUSED_PIN, LMIC_UNUSED_PIN}, // nano 2 6 7 | heltec 14 un un
+   .pConfig = &myConfig,
 };
 
 
