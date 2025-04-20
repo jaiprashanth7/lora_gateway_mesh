@@ -108,6 +108,11 @@
    - Adding `radio.addGatewayRole()` makes the **second version** actively participate in mesh routing as a gateway. Nodes can discover it and choose optimal paths.  
    - Without any gateway role, the **first version** can only broadcast, relying on range rather than routing.
 
+### Raw diffs
+
+Output of `diff -y src/main.cpp lib/LoRaMesher/examples/Counter/src/main.cpp`
+
+
 ```cpp
 #include <Arduino.h>						#include <Arduino.h>
 #include "LoraMesher.h"						#include "LoraMesher.h"
